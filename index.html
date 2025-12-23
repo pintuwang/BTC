@@ -2,136 +2,141 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>MSTR/BTC Max Pain Monitor</title>
+    <title>MSTR/BTC Strategic Monitor</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #121212; color: #e0e0e0; padding: 20px; }
-        .container { max-width: 1000px; margin: auto; background: #1e1e1e; padding: 25px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
-        .advisor-box { background: #252525; border-left: 5px solid #00ff88; padding: 20px; margin-top: 30px; border-radius: 4px; }
-        .status { font-size: 0.9em; color: #888; margin-bottom: 20px; border-bottom: 1px solid #333; padding-bottom: 10px; }
-        h2 { color: #00ff88; margin-top: 0; }
-        .warning { color: #ff4444; font-weight: bold; }
-        .safe { color: #00ff88; font-weight: bold; }
-        #chart-wrapper { position: relative; height: 450px; width: 100%; margin-top: 10px; }
+        body { font-family: 'Segoe UI', sans-serif; background: #121212; color: #e0e0e0; padding: 20px; }
+        .container { max-width: 1000px; margin: auto; background: #1e1e1e; padding: 25px; border-radius: 12px; }
+        .controls { background: #252525; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; align-items: center; gap: 20px; border: 1px solid #333; }
+        .score-box { text-align: center; padding: 20px; border-radius: 8px; margin-bottom: 20px; transition: 0.3s; }
+        .safe-bg { background: #004d26; border: 1px solid #00ff88; }
+        .caution-bg { background: #4d3300; border: 1px solid #ffcc00; }
+        .danger-bg { background: #4d0000; border: 1px solid #ff4444; }
+        input { background: #333; color: white; border: 1px solid #555; padding: 8px; border-radius: 4px; width: 80px; font-size: 1.1em; }
+        .phase-tag { font-size: 0.8em; padding: 4px 8px; border-radius: 4px; background: #444; }
+        #chart-wrapper { height: 400px; margin-top: 20px; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2>MSTR & BTC Institutional Max Pain</h2>
-        <div id="last-update" class="status">Connecting to history.json...</div>
-        
+        <h2>MSTR Strategic Put Advisor</h2>
+
+        <div class="controls">
+            <div>
+                <label>Your Target Strike: $</label>
+                <input type="number" id="strikeInput" value="150" oninput="updateAnalysis()">
+            </div>
+            <div id="phaseDisplay" class="phase-tag">Detecting Market Phase...</div>
+            <div id="last-update" style="font-size: 0.8em; color: #888;"></div>
+        </div>
+
+        <div id="scoreBox" class="score-box">
+            <h1 id="scoreValue">--</h1>
+            <p id="scoreLabel">Loading Data...</p>
+        </div>
+
         <div id="chart-wrapper">
             <canvas id="maxPainChart"></canvas>
         </div>
-        
-        <div id="advisor" class="advisor-box">
-            <h3>Risk Advisor</h3>
-            <p id="advice-text">Analyzing market magnets...</p>
-        </div>
+
+        <div id="advice-text" style="margin-top:20px; line-height: 1.6;"></div>
     </div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            loadData();
-        });
+<script>
+    let globalPayload = null;
 
-        async function loadData() {
-            const adviceEl = document.getElementById('advice-text');
-            const updateEl = document.getElementById('last-update');
+    document.addEventListener('DOMContentLoaded', loadData);
 
-            try {
-                const response = await fetch('./data/history.json');
-                if (!response.ok) throw new Error("JSON not found. Run your Python script first.");
-                
-                const payload = await response.json();
-                updateEl.innerText = `Last Sync: ${payload.last_update} | MSTR Spot: $${payload.spot.toFixed(2)}`;
-                
-                const labels = payload.data.map(d => d.date);
-                const mstrData = payload.data.map(d => d.mstr_pain);
-                const btcData = payload.data.map(d => d.btc_pain);
-
-                renderChart(labels, mstrData, btcData);
-                generateAdvice(payload.data, payload.spot);
-                
-            } catch (err) {
-                adviceEl.innerHTML = `<span class='warning'>Error: ${err.message}</span>`;
-            }
-        }
-
-        function renderChart(labels, mstrData, btcData) {
-            const ctx = document.getElementById('maxPainChart').getContext('2d');
+    async function loadData() {
+        try {
+            const response = await fetch('./data/history.json');
+            globalPayload = await response.json();
             
-            new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        {
-                            label: 'MSTR Max Pain',
-                            data: mstrData,
-                            yAxisID: 'yMSTR',
-                            borderColor: '#00ff88',
-                            backgroundColor: 'rgba(0, 255, 136, 0.1)',
-                            fill: true,
-                            spanGaps: true
-                        },
-                        {
-                            label: 'BTC Max Pain',
-                            data: btcData,
-                            yAxisID: 'yBTC',
-                            borderColor: '#3498db',
-                            borderDash: [5, 5],
-                            spanGaps: true
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        yMSTR: {
-                            type: 'linear',
-                            position: 'left',
-                            beginAtZero: false, // This is the fix for the 0-100 issue
-                            title: { display: true, text: 'MSTR Price ($)', color: '#00ff88' },
-                            grid: { color: '#333' },
-                            ticks: { color: '#e0e0e0' }
-                        },
-                        yBTC: {
-                            type: 'linear',
-                            position: 'right',
-                            beginAtZero: false,
-                            grid: { display: false },
-                            title: { display: true, text: 'BTC Price ($)', color: '#3498db' },
-                            ticks: { color: '#e0e0e0' }
-                        },
-                        x: {
-                            ticks: { color: '#e0e0e0' },
-                            grid: { color: '#333' }
-                        }
-                    },
-                    plugins: {
-                        legend: { labels: { color: '#e0e0e0' } }
-                    }
+            document.getElementById('last-update').innerText = `Sync: ${globalPayload.last_update}`;
+            
+            renderChart();
+            updateAnalysis();
+        } catch (err) {
+            document.getElementById('scoreLabel').innerText = "Error loading history.json";
+        }
+    }
+
+    function getMarketPhase() {
+        const day = new Date().getDay(); // 0=Sun, 1=Mon... 3=Wed
+        const phases = {
+            1: { name: "Provisional", color: "#3498db", desc: "Low Confidence: Week just started." },
+            2: { name: "Provisional", color: "#3498db", desc: "Low Confidence: Data is settling." },
+            3: { name: "Sweet Spot", color: "#00ff88", desc: "High Confidence: Magnets are locked." },
+            4: { name: "Reactive", color: "#ffcc00", desc: "Extreme Force: Expiry approaching." },
+            5: { name: "Reactive", color: "#ffcc00", desc: "Extreme Force: Today is Expiry." }
+        };
+        return phases[day] || { name: "Weekend", color: "#888", desc: "Market is closed." };
+    }
+
+    function updateAnalysis() {
+        if (!globalPayload) return;
+
+        const strike = parseFloat(document.getElementById('strikeInput').value);
+        const spot = globalPayload.spot;
+        const phase = getMarketPhase();
+        const weeklyPain = globalPayload.data[0].mstr_pain;
+        const jan16Pain = globalPayload.data.find(d => d.date === "2026-01-16")?.mstr_pain || weeklyPain;
+
+        // DISPLAY PHASE
+        const phaseEl = document.getElementById('phaseDisplay');
+        phaseEl.innerText = `Phase: ${phase.name}`;
+        phaseEl.style.color = phase.color;
+
+        // CALCULATE SAFETY SCORE (0-10)
+        let score = 0;
+        if (spot > strike * 1.10) score += 4; // 10% buffer
+        else if (spot > strike) score += 2;
+
+        if (weeklyPain > strike) score += 3; // Weekly magnet protects strike
+        if (jan16Pain > strike) score += 3;  // Monthly magnet protects strike
+
+        // Update Score UI
+        const scoreBox = document.getElementById('scoreBox');
+        const scoreVal = document.getElementById('scoreValue');
+        scoreVal.innerText = `Safety Score: ${score}/10`;
+        
+        if (score >= 8) {
+            scoreBox.className = "score-box safe-bg";
+            document.getElementById('scoreLabel').innerText = `IDEAL: ${phase.desc}`;
+        } else if (score >= 5) {
+            scoreBox.className = "score-box caution-bg";
+            document.getElementById('scoreLabel').innerText = `CAUTION: ${phase.desc}`;
+        } else {
+            scoreBox.className = "score-box danger-bg";
+            document.getElementById('scoreLabel').innerText = `DANGER: Strike is too close to magnets!`;
+        }
+    }
+
+    function renderChart() {
+        const ctx = document.getElementById('maxPainChart').getContext('2d');
+        const labels = globalPayload.data.map(d => d.date);
+        const mstr = globalPayload.data.map(d => d.mstr_pain);
+        const btc = globalPayload.data.map(d => d.btc_pain);
+
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    { label: 'MSTR Pain', data: mstr, borderColor: '#00ff88', yAxisID: 'y', spanGaps: true },
+                    { label: 'BTC Pain', data: btc, borderColor: '#3498db', yAxisID: 'y1', spanGaps: true, borderDash: [5,5] }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { type: 'linear', position: 'left', beginAtZero: false },
+                    y1: { type: 'linear', position: 'right', beginAtZero: false, grid: { display: false } }
                 }
-            }); // Properly closed constructor
-        }
-
-        function generateAdvice(data, spot) {
-            const jan16 = data.find(d => d.date === "2026-01-16");
-            let html = "";
-
-            if (spot > 150) {
-                html += `<p class='safe'>✅ MSTR ($${spot.toFixed(2)}) is above your $150 strike.</p>`;
-            } else {
-                html += "<p class='warning'>⚠️ ALERT: MSTR is trading below your $150 strike!</p>";
             }
-
-            if (jan16 && jan16.mstr_pain) {
-                html += `<p>ℹ️ Jan 16 Max Pain magnet is at $${jan16.mstr_pain}.</p>`;
-            }
-            document.getElementById('advice-text').innerHTML = html;
-        }
-    </script>
+        });
+    }
+</script>
 </body>
 </html>
