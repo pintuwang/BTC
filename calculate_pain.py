@@ -6,7 +6,6 @@ import json
 import os
 from datetime import datetime, timedelta
 
-# --- CONFIGURATION ---
 MSTR_TICKER = "MSTR"
 NUM_WEEKS = 8
 
@@ -22,66 +21,69 @@ def get_next_fridays(n):
 def calculate_mstr_max_pain(expiry):
     try:
         tk = yf.Ticker(MSTR_TICKER)
-        # Fetch spot to filter out junk strikes
         spot = tk.history(period='1d')['Close'].iloc[-1]
         chain = tk.option_chain(expiry)
-        calls, puts = chain.calls, chain.puts
         
-        # FILTER: Only consider strikes within 50% of the current price
-        # This prevents the $21.00 and $85.00 "ghost strikes"
-        valid_calls = calls[(calls['strike'] > spot * 0.5) & (calls['strike'] < spot * 1.5)]
-        valid_puts = puts[(puts['strike'] > spot * 0.5) & (puts['strike'] < spot * 1.5)]
+        # FILTER: Only look at strikes within 40% of current price to remove 'junk' data
+        calls = chain.calls[(chain.calls['strike'] > spot * 0.6) & (chain.calls['strike'] < spot * 1.4)]
+        puts = chain.puts[(chain.puts['strike'] > spot * 0.6) & (chain.puts['strike'] < spot * 1.4)]
         
-        strikes = sorted(list(set(valid_calls['strike']).union(set(valid_puts['strike']))))
+        strikes = sorted(list(set(calls['strike']).union(set(puts['strike']))))
         pains = []
-        
         for s in strikes:
-            c_loss = valid_calls[valid_calls['strike'] < s].apply(lambda x: (s - x['strike']) * x['openInterest'], axis=1).sum()
-            p_loss = valid_puts[valid_puts['strike'] > s].apply(lambda x: (x['strike'] - s) * x['openInterest'], axis=1).sum()
+            c_loss = calls[calls['strike'] < s].apply(lambda x: (s - x['strike']) * x['openInterest'], axis=1).sum()
+            p_loss = puts[puts['strike'] > s].apply(lambda x: (x['strike'] - s) * x['openInterest'], axis=1).sum()
             pains.append(c_loss + p_loss)
-            
-        return float(strikes[np.argmin(pains)])
-    except Exception as e:
-        print(f"Error: {e}")
+        return float(strikes[np.argmin(pains)]) if pains else None
+    except:
         return None
 
-def get_btc_max_pain(expiry_date):
-    formatted_date = datetime.strptime(expiry_date, '%Y-%m-%d').strftime('%-d%b%y').upper()
+def get_btc_max_pain_deribit():
+    """Fetches all BTC options from Deribit and calculates Max Pain for each expiry."""
     url = "https://www.deribit.com/api/v2/public/get_book_summary_by_currency?currency=BTC&kind=option"
     try:
-        response = requests.get(url).json()
-        instruments = response['result']
-        expiry_data = [i for i in instruments if formatted_date in i['instrument_name']]
-        strikes = {}
-        for i in expiry_data:
-            strike = int(i['instrument_name'].split('-')[2])
-            oi = i.get('open_interest', 0)
-            strikes[strike] = strikes.get(strike, 0) + oi
-        return max(strikes, key=strikes.get) if strikes else None
-    except Exception as e:
-        print(f"Error fetching BTC for {expiry_date}: {e}")
-        return None
+        data = requests.get(url).json()['result']
+        df = pd.DataFrame(data)
+        # Extract date from instrument name (e.g., BTC-27DEC24-90000-C)
+        df['expiry'] = df['instrument_name'].apply(lambda x: x.split('-')[1])
+        df['strike'] = df['instrument_name'].apply(lambda x: int(x.split('-')[2]))
+        df['type'] = df['instrument_name'].apply(lambda x: x.split('-')[3])
+        
+        results = {}
+        for expiry_str, group in df.groupby('expiry'):
+            try:
+                # Convert Deribit date format back to YYYY-MM-DD
+                expiry_dt = datetime.strptime(expiry_str, '%d%b%y').strftime('%Y-%m-%d')
+                strikes = sorted(group['strike'].unique())
+                pains = []
+                for s in strikes:
+                    # Intrinsic value calculation
+                    c_loss = group[(group['type'] == 'C') & (group['strike'] < s)].apply(lambda x: (s - x['strike']) * x['open_interest'], axis=1).sum()
+                    p_loss = group[(group['type'] == 'P') & (group['strike'] > s)].apply(lambda x: (x['strike'] - s) * x['open_interest'], axis=1).sum()
+                    pains.append(c_loss + p_loss)
+                results[expiry_dt] = float(strikes[np.argmin(pains)])
+            except: continue
+        return results
+    except:
+        return {}
 
 def run_monitor():
-    # 1. Ensure data directory exists
-    if not os.path.exists('data'):
-        os.makedirs('data')
-
+    if not os.path.exists('data'): os.makedirs('data')
+    
     fridays = get_next_fridays(NUM_WEEKS)
     mstr_spot = yf.Ticker(MSTR_TICKER).history(period='1d')['Close'].iloc[-1]
+    btc_pains_all = get_btc_max_pain_deribit()
     
-    results = []
+    final_data = []
     for f in fridays:
         m_pain = calculate_mstr_max_pain(f)
-        b_pain = get_btc_max_pain(f)
-        results.append({"date": f, "mstr_pain": m_pain, "btc_pain": b_pain})
+        b_pain = btc_pains_all.get(f) # Match Deribit date to our Friday list
+        final_data.append({"date": f, "mstr_pain": m_pain, "btc_pain": b_pain})
 
-    # 2. Save data
-    output = {"last_update": str(datetime.now()), "spot": float(mstr_spot), "data": results}
+    output = {"last_update": datetime.now().strftime("%Y-%m-%d %H:%M"), "spot": float(mstr_spot), "data": final_data}
     with open('data/history.json', 'w') as f:
         json.dump(output, f, indent=4)
-
-    print(f"Update Complete. MSTR Spot: {mstr_spot}")
+    print("Monitor Updated Successfully.")
 
 if __name__ == "__main__":
     run_monitor()
