@@ -8,13 +8,27 @@
         body { font-family: 'Segoe UI', sans-serif; background: #121212; color: #e0e0e0; padding: 20px; }
         .container { max-width: 1000px; margin: auto; background: #1e1e1e; padding: 25px; border-radius: 12px; }
         .controls { background: #252525; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; align-items: center; gap: 20px; border: 1px solid #333; }
-        .score-box { text-align: center; padding: 20px; border-radius: 8px; margin-bottom: 20px; transition: 0.3s; }
-        .safe-bg { background: #004d26; border: 1px solid #00ff88; }
-        .caution-bg { background: #4d3300; border: 1px solid #ffcc00; }
-        .danger-bg { background: #4d0000; border: 1px solid #ff4444; }
-        input { background: #333; color: white; border: 1px solid #555; padding: 8px; border-radius: 4px; width: 80px; font-size: 1.1em; }
-        .phase-tag { font-size: 0.8em; padding: 4px 8px; border-radius: 4px; background: #444; }
-        #chart-wrapper { height: 400px; margin-top: 20px; }
+        
+        /* Phase Tooltip Container */
+        .phase-container { position: relative; display: inline-block; cursor: help; }
+        .phase-tag { font-size: 0.9em; padding: 6px 12px; border-radius: 4px; background: #333; border: 1px solid #444; font-weight: bold; }
+        .phase-tooltip { 
+            visibility: hidden; width: 220px; background-color: #444; color: #fff; text-align: left;
+            border-radius: 6px; padding: 10px; position: absolute; z-index: 10; bottom: 125%; left: 50%;
+            transform: translateX(-50%); opacity: 0; transition: opacity 0.3s; font-size: 0.85em; line-height: 1.4; border: 1px solid #666;
+        }
+        .phase-container:hover .phase-tooltip { visibility: visible; opacity: 1; }
+
+        .score-box { text-align: center; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 2px solid transparent; }
+        .safe-bg { background: rgba(0, 255, 136, 0.1); border-color: #00ff88; color: #00ff88; }
+        .caution-bg { background: rgba(255, 204, 0, 0.1); border-color: #ffcc00; color: #ffcc00; }
+        .danger-bg { background: rgba(255, 68, 68, 0.1); border-color: #ff4444; color: #ff4444; }
+
+        input { background: #333; color: white; border: 1px solid #555; padding: 8px; border-radius: 4px; width: 80px; font-size: 1.1em; outline: none; }
+        input:focus { border-color: #00ff88; }
+        #chart-wrapper { height: 450px; margin-top: 20px; }
+        .legend-note { font-size: 0.85em; color: #888; margin-top: 10px; display: flex; gap: 15px; }
+        .red-dot { color: #ff4444; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -23,11 +37,19 @@
 
         <div class="controls">
             <div>
-                <label>Your Target Strike: $</label>
+                <label>Target Strike: $</label>
                 <input type="number" id="strikeInput" value="150" oninput="updateAnalysis()">
             </div>
-            <div id="phaseDisplay" class="phase-tag">Detecting Market Phase...</div>
-            <div id="last-update" style="font-size: 0.8em; color: #888;"></div>
+            
+            <div class="phase-container">
+                <div id="phaseDisplay" class="phase-tag">Detecting Phase...</div>
+                <div id="phaseDescription" class="phase-tooltip">
+                    <b>Provisional:</b> Mon/Tue. Data is early/noisy.<br><br>
+                    <b>Sweet Spot:</b> Wed. OI is settled. High accuracy.<br><br>
+                    <b>Reactive:</b> Thu/Fri. Magnet force is at max strength.
+                </div>
+            </div>
+            <div id="last-update" style="font-size: 0.8em; color: #888; margin-left: auto;"></div>
         </div>
 
         <div id="scoreBox" class="score-box">
@@ -39,100 +61,122 @@
             <canvas id="maxPainChart"></canvas>
         </div>
 
-        <div id="advice-text" style="margin-top:20px; line-height: 1.6;"></div>
+        <div class="legend-note">
+            <span>🟢 MSTR Max Pain</span>
+            <span>🔵 BTC Max Pain (Right Axis)</span>
+            <span><span class="red-dot">◆ Red Diamond:</span> Monthly Expiry (Higher Volume/Stronger Magnet)</span>
+        </div>
     </div>
 
 <script>
     let globalPayload = null;
+    let myChart = null;
 
     document.addEventListener('DOMContentLoaded', loadData);
 
     async function loadData() {
         try {
+            // Replace with your actual path
             const response = await fetch('./data/history.json');
             globalPayload = await response.json();
-            
-            document.getElementById('last-update').innerText = `Sync: ${globalPayload.last_update}`;
-            
+            document.getElementById('last-update').innerText = `Updated: ${globalPayload.last_update}`;
             renderChart();
             updateAnalysis();
         } catch (err) {
-            document.getElementById('scoreLabel').innerText = "Error loading history.json";
+            document.getElementById('scoreLabel').innerText = "Waiting for data/history.json...";
         }
     }
 
+    function isMonthly(dateStr) {
+        const date = new Date(dateStr);
+        const day = date.getDate();
+        // The 3rd Friday of any month must fall between the 15th and 21st
+        return day >= 15 && day <= 21;
+    }
+
     function getMarketPhase() {
-        const day = new Date().getDay(); // 0=Sun, 1=Mon... 3=Wed
-        const phases = {
-            1: { name: "Provisional", color: "#3498db", desc: "Low Confidence: Week just started." },
-            2: { name: "Provisional", color: "#3498db", desc: "Low Confidence: Data is settling." },
-            3: { name: "Sweet Spot", color: "#00ff88", desc: "High Confidence: Magnets are locked." },
-            4: { name: "Reactive", color: "#ffcc00", desc: "Extreme Force: Expiry approaching." },
-            5: { name: "Reactive", color: "#ffcc00", desc: "Extreme Force: Today is Expiry." }
-        };
-        return phases[day] || { name: "Weekend", color: "#888", desc: "Market is closed." };
+        const day = new Date().getDay(); 
+        if (day === 1 || day === 2) return { name: "Provisional", color: "#3498db" };
+        if (day === 3) return { name: "Sweet Spot", color: "#00ff88" };
+        if (day === 4 || day === 5) return { name: "Reactive", color: "#ffcc00" };
+        return { name: "Weekend", color: "#888" };
     }
 
     function updateAnalysis() {
         if (!globalPayload) return;
-
         const strike = parseFloat(document.getElementById('strikeInput').value);
         const spot = globalPayload.spot;
         const phase = getMarketPhase();
-        const weeklyPain = globalPayload.data[0].mstr_pain;
-        const jan16Pain = globalPayload.data.find(d => d.date === "2026-01-16")?.mstr_pain || weeklyPain;
-
-        // DISPLAY PHASE
-        const phaseEl = document.getElementById('phaseDisplay');
-        phaseEl.innerText = `Phase: ${phase.name}`;
-        phaseEl.style.color = phase.color;
-
-        // CALCULATE SAFETY SCORE (0-10)
-        let score = 0;
-        if (spot > strike * 1.10) score += 4; // 10% buffer
-        else if (spot > strike) score += 2;
-
-        if (weeklyPain > strike) score += 3; // Weekly magnet protects strike
-        if (jan16Pain > strike) score += 3;  // Monthly magnet protects strike
-
-        // Update Score UI
-        const scoreBox = document.getElementById('scoreBox');
-        const scoreVal = document.getElementById('scoreValue');
-        scoreVal.innerText = `Safety Score: ${score}/10`;
         
-        if (score >= 8) {
-            scoreBox.className = "score-box safe-bg";
-            document.getElementById('scoreLabel').innerText = `IDEAL: ${phase.desc}`;
-        } else if (score >= 5) {
-            scoreBox.className = "score-box caution-bg";
-            document.getElementById('scoreLabel').innerText = `CAUTION: ${phase.desc}`;
-        } else {
-            scoreBox.className = "score-box danger-bg";
-            document.getElementById('scoreLabel').innerText = `DANGER: Strike is too close to magnets!`;
-        }
+        const weeklyPain = globalPayload.data[0].mstr_pain;
+        const monthlyItem = globalPayload.data.find(d => isMonthly(d.date));
+        const monthlyPain = monthlyItem ? monthlyItem.mstr_pain : weeklyPain;
+
+        document.getElementById('phaseDisplay').innerText = `Phase: ${phase.name}`;
+        document.getElementById('phaseDisplay').style.borderColor = phase.color;
+
+        let score = 0;
+        if (spot > strike * 1.12) score += 4; 
+        else if (spot > strike) score += 2;
+        if (weeklyPain > strike) score += 3; 
+        if (monthlyPain > strike) score += 3; 
+
+        const scoreBox = document.getElementById('scoreBox');
+        document.getElementById('scoreValue').innerText = `Safety Score: ${score}/10`;
+        
+        if (score >= 8) scoreBox.className = "score-box safe-bg";
+        else if (score >= 5) scoreBox.className = "score-box caution-bg";
+        else scoreBox.className = "score-box danger-bg";
+        
+        document.getElementById('scoreLabel').innerText = score >= 8 ? "Safe to Sell" : (score >= 5 ? "Use Caution" : "HIGH RISK");
+        
+        // Dynamic Chart Update: Update point markers if strike changes
+        if(myChart) myChart.update();
     }
 
     function renderChart() {
         const ctx = document.getElementById('maxPainChart').getContext('2d');
         const labels = globalPayload.data.map(d => d.date);
-        const mstr = globalPayload.data.map(d => d.mstr_pain);
-        const btc = globalPayload.data.map(d => d.btc_pain);
-
-        new Chart(ctx, {
+        
+        myChart = new Chart(ctx, {
             type: 'line',
             data: {
                 labels: labels,
                 datasets: [
-                    { label: 'MSTR Pain', data: mstr, borderColor: '#00ff88', yAxisID: 'y', spanGaps: true },
-                    { label: 'BTC Pain', data: btc, borderColor: '#3498db', yAxisID: 'y1', spanGaps: true, borderDash: [5,5] }
+                    {
+                        label: 'MSTR Max Pain',
+                        data: globalPayload.data.map(d => d.mstr_pain),
+                        borderColor: '#00ff88',
+                        pointBackgroundColor: labels.map(d => isMonthly(d) ? '#ff4444' : '#00ff88'),
+                        pointRadius: labels.map(d => isMonthly(d) ? 8 : 4),
+                        pointStyle: labels.map(d => isMonthly(d) ? 'rectRot' : 'circle'),
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'BTC Max Pain',
+                        data: globalPayload.data.map(d => d.btc_pain),
+                        borderColor: '#3498db',
+                        borderDash: [5, 5],
+                        yAxisID: 'y1'
+                    }
                 ]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            afterLabel: function(context) {
+                                if (isMonthly(context.label)) return "⭐ MONTHLY EXPIRY (High Vol)";
+                            }
+                        }
+                    }
+                },
                 scales: {
-                    y: { type: 'linear', position: 'left', beginAtZero: false },
-                    y1: { type: 'linear', position: 'right', beginAtZero: false, grid: { display: false } }
+                    y: { grid: { color: '#333' } },
+                    y1: { position: 'right', grid: { display: false } }
                 }
             }
         });
