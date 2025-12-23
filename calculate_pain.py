@@ -22,17 +22,27 @@ def get_next_fridays(n):
 def calculate_mstr_max_pain(expiry):
     try:
         tk = yf.Ticker(MSTR_TICKER)
+        # Fetch spot to filter out junk strikes
+        spot = tk.history(period='1d')['Close'].iloc[-1]
         chain = tk.option_chain(expiry)
         calls, puts = chain.calls, chain.puts
-        strikes = sorted(list(set(calls['strike']).union(set(puts['strike']))))
+        
+        # FILTER: Only consider strikes within 50% of the current price
+        # This prevents the $21.00 and $85.00 "ghost strikes"
+        valid_calls = calls[(calls['strike'] > spot * 0.5) & (calls['strike'] < spot * 1.5)]
+        valid_puts = puts[(puts['strike'] > spot * 0.5) & (puts['strike'] < spot * 1.5)]
+        
+        strikes = sorted(list(set(valid_calls['strike']).union(set(valid_puts['strike']))))
         pains = []
+        
         for s in strikes:
-            c_loss = calls[calls['strike'] < s].apply(lambda x: (s - x['strike']) * x['openInterest'], axis=1).sum()
-            p_loss = puts[puts['strike'] > s].apply(lambda x: (x['strike'] - s) * x['openInterest'], axis=1).sum()
+            c_loss = valid_calls[valid_calls['strike'] < s].apply(lambda x: (s - x['strike']) * x['openInterest'], axis=1).sum()
+            p_loss = valid_puts[valid_puts['strike'] > s].apply(lambda x: (x['strike'] - s) * x['openInterest'], axis=1).sum()
             pains.append(c_loss + p_loss)
+            
         return float(strikes[np.argmin(pains)])
     except Exception as e:
-        print(f"Error calculating MSTR for {expiry}: {e}")
+        print(f"Error: {e}")
         return None
 
 def get_btc_max_pain(expiry_date):
