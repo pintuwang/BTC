@@ -22,10 +22,14 @@
     </div>
 
     <script>
-        // Placeholder Data (You would populate this from your Python script)
-        const dates = ["Dec 26", "Jan 02", "Jan 09", "Jan 16", "Jan 23", "Jan 30", "Feb 06", "Feb 13"];
-        const mstrPain = [167.5, 175, 190, 150, 195, 195, 170, 165];
-        const btcPain = [94000, 96000, 92000, 89000, 95000, 94000, 92000, 90000];
+        fetch('./data/history.json')
+          .then(response => response.json())
+          .then(payload => {
+              const dates = payload.data.map(d => d.date);
+              const mstrPain = payload.data.map(d => d.mstr_pain);
+              const btcPain = payload.data.map(d => d.btc_pain);
+      // ... update chart ...
+         });
 
         const ctx = document.getElementById('maxPainChart').getContext('2d');
         new Chart(ctx, {
