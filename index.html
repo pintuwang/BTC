@@ -5,73 +5,61 @@
     <title>MSTR/BTC Strategic Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: 'Inter', sans-serif; background: #080808; color: #fff; padding: 20px; }
-        .container { max-width: 1200px; margin: auto; background: #111; padding: 30px; border-radius: 15px; border: 1px solid #222; }
-        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; padding-bottom: 20px; }
-        .chart-container { height: 550px; margin-top: 30px; }
-        .caret-note { color: #ff4444; font-size: 0.8em; font-weight: bold; margin-top: 10px; }
-        #sgt-time { color: #888; font-size: 0.9em; }
-        table { width: 100%; border-collapse: collapse; margin-top: 30px; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #222; }
+        body { font-family: 'Segoe UI', sans-serif; background: #0a0a0a; color: #fff; padding: 20px; }
+        .container { max-width: 1100px; margin: auto; background: #111; padding: 25px; border-radius: 15px; border: 1px solid #333; }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #444; padding-bottom: 15px; }
+        .chart-box { height: 500px; margin-top: 25px; }
+        .legend-tag { color: #ff4444; font-size: 0.85em; font-weight: bold; margin-top: 5px; }
+        #sgt-clock { color: #888; font-size: 0.9em; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <div>
-                <h1 style="margin:0; color:#00ff88;">Institutional Magnet Monitor</h1>
-                <div class="caret-note">▲ RED TRIANGLE = Monthly Expiry (High Gravity)</div>
+                <h2 style="margin:0;">Institutional Magnet Monitor</h2>
+                <div class="legend-tag">▲ RED TRIANGLE = 3rd Friday Monthly Expiry</div>
             </div>
-            <div id="sgt-time">SGT: --</div>
+            <div id="sgt-clock">SGT: --</div>
         </div>
-
-        <div class="chart-container">
-            <canvas id="mainChart"></canvas>
-        </div>
-
-        <h3>30-Day Snapshot Log</h3>
-        <table id="logTable">
-            <thead><tr><th>Date</th><th>BTC Spot</th><th>MSTR Pain</th><th>Phase</th></tr></thead>
-            <tbody id="logBody"></tbody>
-        </table>
+        <div class="chart-box"><canvas id="mainChart"></canvas></div>
     </div>
 
 <script>
-    async function load() {
+    async function init() {
         const res = await fetch('./data/history.json');
         const market = await res.json();
         
-        // SGT Time Setup
-        const utc = new Date(market.last_update_utc);
-        document.getElementById('sgt-time').innerText = `Updated (SGT): ${utc.toLocaleString('en-SG', {timeZone:'Asia/Singapore'})}`;
+        // Convert to Singapore Time
+        const dateObj = new Date(market.last_update_utc);
+        document.getElementById('sgt-clock').innerText = `Updated (SGT): ${dateObj.toLocaleString('en-SG', {timeZone:'Asia/Singapore'})}`;
 
-        render(market.data);
-        renderTable();
-    }
-
-    function render(data) {
         const ctx = document.getElementById('mainChart').getContext('2d');
+        const data = market.data;
+
         new Chart(ctx, {
             type: 'line',
             data: {
                 labels: data.map(d => d.date),
                 datasets: [
                     {
-                        label: 'MSTR Max Pain',
+                        label: 'MSTR Max Pain (L)',
                         data: data.map(d => d.mstr_pain),
                         borderColor: '#00ff88',
-                        yAxisID: 'yMSTR',
+                        yAxisID: 'yLeft',
+                        // Logic for Red Caret markers
                         pointStyle: data.map(d => d.is_monthly ? 'triangle' : 'circle'),
                         pointRadius: data.map(d => d.is_monthly ? 12 : 5),
-                        pointBackgroundColor: data.map(d => d.is_monthly ? 'red' : '#00ff88'),
+                        pointBackgroundColor: data.map(d => d.is_monthly ? '#ff4444' : '#00ff88'),
+                        pointBorderColor: data.map(d => d.is_monthly ? '#fff' : '#00ff88'),
                         tension: 0.3
                     },
                     {
-                        label: 'BTC Max Pain',
+                        label: 'BTC Max Pain (R)',
                         data: data.map(d => d.btc_pain),
                         borderColor: '#3498db',
                         borderDash: [5, 5],
-                        yAxisID: 'yBTC',
+                        yAxisID: 'yRight',
                         tension: 0.3
                     }
                 ]
@@ -80,27 +68,24 @@
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: {
-                    yMSTR: { type: 'linear', position: 'left', grid: { color: '#222' }, title: { display: true, text: 'MSTR ($)' } },
-                    yBTC: { type: 'linear', position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'BTC ($)' } }
+                    yLeft: {
+                        type: 'linear', position: 'left',
+                        title: { display: true, text: 'MSTR Price', color: '#00ff88' },
+                        grid: { color: '#222' }
+                    },
+                    yRight: {
+                        type: 'linear', position: 'right',
+                        title: { display: true, text: 'BTC Price', color: '#3498db' },
+                        grid: { drawOnChartArea: false }
+                    }
+                },
+                plugins: {
+                    legend: { labels: { color: '#fff', usePointStyle: true } }
                 }
             }
         });
     }
-
-    async function renderTable() {
-        const res = await fetch('./data/history_log.json');
-        const logs = await res.json();
-        document.getElementById('logBody').innerHTML = logs.reverse().map(l => `
-            <tr>
-                <td>${l.date}</td>
-                <td>$${l.spot.toLocaleString()}</td>
-                <td>$${l.mstr_pain}</td>
-                <td>${l.confidence}</td>
-            </tr>
-        `).join('');
-    }
-
-    load();
+    init();
 </script>
 </body>
 </html>
