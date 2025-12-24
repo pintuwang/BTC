@@ -1,57 +1,77 @@
 import os
 import json
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime
 
-def get_confidence_level():
-    # 0 = Monday, 2 = Wednesday, 4 = Friday
-    day_num = datetime.now().weekday()
-    if day_num <= 1: # Mon/Tue
-        return "Provisional (Low Confidence)"
-    elif day_num == 2: # Wed
-        return "Sweet Spot (High Confidence)"
-    else: # Thu/Fri
-        return "Reactive (Maximum Gravity)"
+# 1. API SETTINGS
+BASE_URL = "https://www.deribit.com/api/v2/public/"
+CURRENCY = "BTC" 
+
+def get_live_data():
+    """Fetches real data from Deribit API."""
+    try:
+        # Get Current Spot Price
+        spot_res = requests.get(f"{BASE_URL}get_index_price?index_name=btc_usd").json()
+        current_spot = spot_res['result']['index_price']
+
+        # Get all expiries
+        exp_res = requests.get(f"{BASE_URL}get_expirations?currency={CURRENCY}").json()
+        all_dates = exp_res['result'][:6]  # Take the next 6 Fridays
+
+        chain_data = []
+        for date_str in all_dates:
+            # Monthly Expiry Check (3rd Friday)
+            d_obj = datetime.strptime(date_str, "%d%b%y")
+            is_monthly = (15 <= d_obj.day <= 21)
+            
+            # Fetch Max Pain for this date (using CoinGlass or Deribit Summary)
+            # For this script, we fetch the book summary to approximate
+            params = {"currency": CURRENCY, "kind": "option"}
+            summary = requests.get(f"{BASE_URL}get_book_summary_by_currency", params=params).json()
+            
+            # (In a full setup, you'd calculate Max Pain from the OI of each strike)
+            # Here we use a placeholder that mimics the logic you need:
+            chain_data.append({
+                "date": d_obj.strftime("%Y-%m-%d"),
+                "mstr_pain": 170.0, # Placeholder: Replace with your MSTR logic
+                "btc_pain": 96500.0, # Placeholder: Replace with your BTC logic
+                "is_monthly": is_monthly
+            })
+            
+        return current_spot, chain_data
+    except Exception as e:
+        print(f"Error fetching: {e}")
+        return None, None
+
+def get_confidence():
+    day = datetime.now().weekday()
+    if day <= 1: return "Provisional (Low Confidence)"
+    if day == 2: return "Sweet Spot (High Confidence)"
+    return "Reactive (Maximum Gravity)"
 
 def run_update():
-    # Simulate fetching 6 Fridays
-    dates = ["2025-12-26", "2026-01-02", "2026-01-09", "2026-01-16", "2026-01-23", "2026-01-30"]
-    chain_data = []
-    for i, date in enumerate(dates):
-        chain_data.append({
-            "date": date,
-            "mstr_pain": 165 + (i * 2),
-            "btc_pain": 96000 + (i * 500)
-        })
+    spot, chain = get_live_data()
+    if not spot: return
 
-    current_spot = 178.20 # Replace with live price fetch
-    
     full_payload = {
-        "last_update_utc": datetime.utcnow().isoformat(), # Use ISO UTC for JS conversion
-        "spot": current_spot,
-        "confidence": get_confidence_level(),
-        "data": chain_data
+        "last_update_utc": datetime.utcnow().isoformat(),
+        "spot": spot,
+        "confidence": get_confidence(),
+        "data": chain
     }
 
+    # Save live chart data
     os.makedirs('data', exist_ok=True)
     with open('data/history.json', 'w') as f:
         json.dump(full_payload, f, indent=4)
 
-    # Historical Log Update
+    # Save to table log
     log_path = 'data/history_log.json'
-    if os.path.exists(log_path):
-        with open(log_path, 'r') as f: log = json.load(f)
-    else: log = []
-
-    new_log = {
-        "date": datetime.now().strftime("%Y-%m-%d"),
-        "spot": current_spot,
-        "mstr_pain": chain_data[0]['mstr_pain'],
-        "confidence": full_payload["confidence"]
-    }
+    log = json.load(open(log_path)) if os.path.exists(log_path) else []
     
-    if not log or log[-1]['date'] != new_log['date']:
-        log.append(new_log)
+    new_entry = {"date": datetime.now().strftime("%Y-%m-%d"), "spot": spot, "mstr_pain": chain[0]['mstr_pain'], "confidence": full_payload["confidence"]}
+    if not log or log[-1]['date'] != new_entry['date']:
+        log.append(new_entry)
         with open(log_path, 'w') as f: json.dump(log[-30:], f, indent=4)
 
 if __name__ == "__main__":
