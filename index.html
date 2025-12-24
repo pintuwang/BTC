@@ -2,140 +2,131 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>MSTR/BTC Strategic Monitor - RESTORED</title>
+    <title>MSTR Strategic Monitor - SGT Edition</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #0a0a0a; color: #e0e0e0; padding: 20px; }
-        .container { max-width: 1100px; margin: auto; background: #161616; padding: 25px; border-radius: 15px; border: 1px solid #333; }
+        body { font-family: 'Inter', sans-serif; background: #080808; color: #fff; padding: 20px; }
+        .container { max-width: 1100px; margin: auto; background: #111; padding: 30px; border-radius: 20px; border: 1px solid #222; }
         
-        @keyframes neon-pulse {
-            0% { box-shadow: 0 0 10px #ff0000; background: rgba(255, 0, 0, 0.1); }
-            100% { box-shadow: 0 0 30px #ff0000; background: rgba(255, 0, 0, 0.4); }
+        /* Confidence Badge Styling */
+        .confidence-pill { 
+            display: inline-block; padding: 6px 15px; border-radius: 20px; 
+            font-size: 0.8em; font-weight: bold; text-transform: uppercase; margin-top: 10px;
         }
-        .emergency-neon { animation: neon-pulse 0.6s infinite alternate; border: 2px solid red !important; }
+        .provisional { background: #332200; color: #ffcc00; }
+        .sweet-spot { background: #003311; color: #00ff88; border: 1px solid #00ff88; }
+        .reactive { background: #330000; color: #ff4444; animation: pulse 2s infinite; }
 
-        .score-card { text-align: center; padding: 30px; border-radius: 12px; background: #222; margin-bottom: 25px; border: 1px solid #444; transition: 0.5s; }
-        .chart-box { height: 450px; margin-bottom: 30px; }
-        input { background: #222; color: #00ff88; border: 1px solid #444; padding: 10px; border-radius: 5px; width: 100px; font-weight: bold; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
         
-        table { width: 100%; border-collapse: collapse; background: #1a1a1a; border-radius: 8px; overflow: hidden; }
-        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #333; }
-        th { background: #252525; color: #888; }
+        .score-box { text-align: center; border-radius: 15px; background: #1a1a1a; padding: 40px; margin-bottom: 30px; border: 1px solid #333; }
+        .chart-container { height: 400px; margin: 20px 0; }
+        #sgt-time { color: #888; font-size: 0.9em; font-weight: 500; }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="score-card" id="statusCard">
-            <h1 id="liveScore" style="font-size: 3.5em; margin: 0;">--</h1>
-            <p id="statusLabel" style="font-weight: bold; letter-spacing: 2px;"></p>
+        <div class="score-box" id="mainHeader">
+            <h1 id="scoreDisplay" style="font-size: 4em; margin: 0;">--</h1>
+            <div id="confidenceBadge" class="confidence-pill">LOADING...</div>
+            <p id="statusMsg" style="margin-top: 15px; letter-spacing: 1px; color: #aaa;"></p>
         </div>
 
-        <div style="margin-bottom: 20px; display:flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; padding: 0 10px;">
             <div>
-                <label>Target Strike: $</label>
-                <input type="number" id="strikeVal" value="150" oninput="refreshDisplay()">
+                <label style="color: #666;">Strike Target</label><br>
+                <input type="number" id="strikeInput" value="150" oninput="updateDisplay()" style="background:#222; border:1px solid #444; color:#00ff88; padding:8px; border-radius:5px; width:100px; font-size:1.1em;">
             </div>
-            <div id="syncTag" style="color: #666; font-size: 0.85em;"></div>
+            <div id="sgt-time">SGT: --</div>
         </div>
 
-        <div class="chart-box">
-            <canvas id="mstrBtcChart"></canvas>
+        <div class="chart-container">
+            <canvas id="mainChart"></canvas>
         </div>
 
-        <h3>Institutional Trend History</h3>
-        <table>
-            <thead><tr><th>Date</th><th>MSTR Spot</th><th>Max Pain</th><th>Risk Level</th></tr></thead>
-            <tbody id="historyList"></tbody>
+        <h3 style="margin-top:40px;">Historical Data Log</h3>
+        <table style="width:100%; border-collapse: collapse; background:#161616; border-radius:10px; overflow:hidden;">
+            <thead style="background:#222; color:#777;">
+                <tr><th style="padding:15px; text-align:left;">Date</th><th>Spot</th><th>Max Pain</th><th>Phase</th></tr>
+            </thead>
+            <tbody id="logBody" style="text-align:center;"></tbody>
         </table>
     </div>
 
 <script>
-    let rawData = null;
-    let chartObj = null;
+    let marketData = null;
+    let chartInstance = null;
 
-    async function loadData() {
-        const response = await fetch('./data/history.json');
-        rawData = await response.json();
-        document.getElementById('syncTag').innerText = `Sync: ${rawData.last_update}`;
-        refreshDisplay();
-        renderLogTable();
-    }
-
-    function refreshDisplay() {
-        const strike = parseFloat(document.getElementById('strikeVal').value);
-        const spot = rawData.spot;
-        const pain = rawData.data[0].mstr_pain;
-
-        let score = 0;
-        if (spot > strike * 1.10) score += 4;
-        if (pain > strike) score += 6;
-
-        const card = document.getElementById('statusCard');
-        document.getElementById('liveScore').innerText = `${score}/10`;
+    async function init() {
+        const res = await fetch('./data/history.json');
+        marketData = await res.json();
         
-        card.className = "score-card";
-        if (spot <= strike * 1.05) {
-            card.classList.add('emergency-neon');
-            document.getElementById('statusLabel').innerText = "⚠️ EMERGENCY: DEFEND STRIKE";
-        } else {
-            document.getElementById('statusLabel').innerText = score >= 8 ? "SAFE TRADING" : "CAUTION";
-            card.style.borderColor = score >= 8 ? "#00ff88" : "#ffcc00";
-            card.style.color = score >= 8 ? "#00ff88" : "#ffcc00";
-        }
-
-        updateChart(strike);
+        // Convert UTC to Singapore Time
+        const utcDate = new Date(marketData.last_update_utc);
+        const sgtString = utcDate.toLocaleString('en-SG', { 
+            timeZone: 'Asia/Singapore',
+            dateStyle: 'medium',
+            timeStyle: 'short'
+        });
+        document.getElementById('sgt-time').innerText = `Updated (SGT): ${sgtString}`;
+        
+        updateDisplay();
+        loadHistoryTable();
     }
 
-    async function renderLogTable() {
+    function updateDisplay() {
+        const strike = parseFloat(document.getElementById('strikeInput').value);
+        const spot = marketData.spot;
+        const pain = marketData.data[0].mstr_pain;
+        const confidence = marketData.confidence;
+
+        // Visual Logic
+        const badge = document.getElementById('confidenceBadge');
+        badge.innerText = confidence;
+        badge.className = "confidence-pill " + (confidence.includes("Provisional") ? "provisional" : 
+                                               confidence.includes("Sweet") ? "sweet-spot" : "reactive");
+
+        let score = (spot > strike * 1.1) ? 4 : 0;
+        score += (pain > strike) ? 6 : 0;
+
+        document.getElementById('scoreDisplay').innerText = `${score}/10`;
+        document.getElementById('scoreDisplay').style.color = score >= 8 ? "#00ff88" : "#ffcc00";
+        document.getElementById('statusMsg').innerText = score >= 8 ? "STRATEGY: HOLD / NEUTRAL" : "STRATEGY: CAUTION / COVER";
+
+        renderChart(strike);
+    }
+
+    function renderChart(strike) {
+        const ctx = document.getElementById('mainChart').getContext('2d');
+        if (chartInstance) chartInstance.destroy();
+
+        chartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: marketData.data.map(d => d.date),
+                datasets: [
+                    { label: 'MSTR Max Pain', data: marketData.data.map(d => d.mstr_pain), borderColor: '#00ff88', tension: 0.3 },
+                    { label: 'BTC Proxy', data: marketData.data.map(d => d.btc_pain / 550), borderColor: '#3498db', borderDash: [5,5], tension: 0.3 }
+                ]
+            },
+            options: { responsive: true, maintainAspectRatio: false, scales: { y: { grid: { color: '#222' } } } }
+        });
+    }
+
+    async function loadHistoryTable() {
         const res = await fetch('./data/history_log.json');
         const logs = await res.json();
-        document.getElementById('historyList').innerHTML = logs.reverse().map(l => `
-            <tr>
-                <td>${l.date}</td>
+        document.getElementById('logBody').innerHTML = logs.reverse().map(l => `
+            <tr style="border-bottom: 1px solid #222;">
+                <td style="padding:15px; text-align:left;">${l.date}</td>
                 <td>$${l.spot}</td>
                 <td>$${l.mstr_pain}</td>
-                <td style="color:${l.score >= 8 ? '#00ff88' : '#ff4444'}">${l.score >= 8 ? '✓ Healthy' : '⚠ Shifting'}</td>
+                <td><small>${l.confidence}</small></td>
             </tr>
         `).join('');
     }
 
-    function updateChart(strike) {
-        const ctx = document.getElementById('mstrBtcChart').getContext('2d');
-        if (chartObj) chartObj.destroy();
-
-        chartObj = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: rawData.data.map(d => d.date), // RESTORED 6-WEEK LABELS
-                datasets: [
-                    {
-                        label: 'MSTR Max Pain',
-                        data: rawData.data.map(d => d.mstr_pain),
-                        borderColor: '#00ff88',
-                        tension: 0.3
-                    },
-                    {
-                        label: 'BTC Pain (Scaled)',
-                        data: rawData.data.map(d => d.btc_pain / 550), // RESTORED BTC LINE
-                        borderColor: '#3498db',
-                        borderDash: [5, 5],
-                        tension: 0.3
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: { grid: { color: '#222' } }
-                }
-            }
-        });
-    }
-
-    loadData();
+    init();
 </script>
 </body>
 </html>
-
-  
