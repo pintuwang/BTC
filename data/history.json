@@ -1,24 +1,18 @@
 {
-    "last_update_utc": "2025-12-24T08:53:08.007179Z",
+    "last_update_utc": "2025-12-24T08:58:46.789009Z",
     "spot": 157.88,
     "phase": "Wednesday",
     "data": [
         {
             "date": "2026-01-16",
             "mstr_pain": 15.0,
-            "btc_pain": 96000.0,
+            "btc_pain": 105000.0,
             "is_monthly": true
         },
         {
             "date": "2026-02-20",
             "mstr_pain": 740.0,
-            "btc_pain": 96000.0,
-            "is_monthly": true
-        },
-        {
-            "date": "2026-03-20",
-            "mstr_pain": 640.0,
-            "btc_pain": 96000.0,
+            "btc_pain": 105000.0,
             "is_monthly": true
         }
     ]
