@@ -2,36 +2,65 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>MSTR Strategic Monitor - Volume Overlay</title>
+    <title>MSTR/BTC Strategic Monitor - Professional Edition</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #121212; color: #e0e0e0; padding: 20px; }
-        .container { max-width: 1100px; margin: auto; background: #1e1e1e; padding: 25px; border-radius: 12px; }
-        .controls { background: #252525; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; align-items: center; gap: 20px; border: 1px solid #333; }
-        .score-box { text-align: center; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #444; }
+        /* Base Styling */
+        body { font-family: 'Segoe UI', Roboto, sans-serif; background: #0f0f0f; color: #e0e0e0; padding: 20px; }
+        .container { max-width: 1200px; margin: auto; background: #181818; padding: 25px; border-radius: 12px; border: 1px solid #333; }
+        
+        /* Controls & Last Update */
+        .controls { background: #222; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; align-items: center; gap: 20px; border: 1px solid #444; }
+        input { background: #333; color: white; border: 1px solid #555; padding: 8px; border-radius: 4px; width: 90px; font-size: 1.1em; outline: none; }
+        input:focus { border-color: #00ff88; }
+
+        /* Market Phase Tooltip */
+        .phase-container { position: relative; display: inline-block; cursor: help; }
+        .phase-tag { font-size: 0.9em; padding: 6px 12px; border-radius: 4px; background: #333; border: 1px solid #555; font-weight: bold; }
+        .phase-tooltip { 
+            visibility: hidden; width: 240px; background-color: #2c2c2c; color: #fff; text-align: left;
+            border-radius: 6px; padding: 12px; position: absolute; z-index: 10; bottom: 125%; left: 50%;
+            transform: translateX(-50%); opacity: 0; transition: opacity 0.3s; font-size: 0.85em; line-height: 1.4; border: 1px solid #666; box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+        }
+        .phase-container:hover .phase-tooltip { visibility: visible; opacity: 1; }
+
+        /* Safety Score Box */
+        .score-box { text-align: center; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 2px solid transparent; transition: 0.3s; }
         .safe-bg { background: rgba(0, 255, 136, 0.1); border-color: #00ff88; color: #00ff88; }
         .caution-bg { background: rgba(255, 204, 0, 0.1); border-color: #ffcc00; color: #ffcc00; }
         .danger-bg { background: rgba(255, 68, 68, 0.1); border-color: #ff4444; color: #ff4444; }
-        input { background: #333; color: white; border: 1px solid #555; padding: 8px; border-radius: 4px; width: 80px; font-size: 1.1em; }
-        #chart-wrapper { height: 500px; margin-top: 20px; }
-        .legend-note { font-size: 0.85em; color: #888; margin-top: 15px; display: flex; gap: 20px; justify-content: center;}
+
+        /* Chart & Legend */
+        #chart-wrapper { height: 550px; margin-top: 20px; }
+        .legend-note { font-size: 0.85em; color: #aaa; margin-top: 15px; display: flex; gap: 25px; justify-content: center; flex-wrap: wrap; }
+        .red-dot { color: #ff4444; font-weight: bold; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2>MSTR Strategic Put Advisor (Volume & Price)</h2>
+        <h2 style="margin-top: 0; color: #fff;">📈 MSTR Strategic Put Advisor <span style="font-size: 0.6em; color: #888;">(Price & Volume)</span></h2>
 
         <div class="controls">
             <div>
                 <label>Target Strike: $</label>
                 <input type="number" id="strikeInput" value="150" oninput="updateAnalysis()">
             </div>
+            
+            <div class="phase-container">
+                <div id="phaseDisplay" class="phase-tag">Detecting Phase...</div>
+                <div class="phase-tooltip">
+                    <b>Provisional (Mon/Tue):</b> Data is still building. Use for planning only.<br><br>
+                    <b>Sweet Spot (Wed):</b> 🟢 <b>Highest Accuracy.</b> Most OI is locked in.<br><br>
+                    <b>Reactive (Thu/Fri):</b> Max gravitational force toward the magnet.
+                </div>
+            </div>
+
             <div id="last-update" style="font-size: 0.8em; color: #888; margin-left: auto;"></div>
         </div>
 
         <div id="scoreBox" class="score-box">
-            <h1 id="scoreValue">--</h1>
-            <p id="scoreLabel">Filtering Market Data...</p>
+            <h1 id="scoreValue" style="margin: 0; font-size: 2.5em;">--</h1>
+            <p id="scoreLabel" style="margin: 5px 0 0 0; font-weight: bold; letter-spacing: 1px;">INITIALIZING...</p>
         </div>
 
         <div id="chart-wrapper">
@@ -39,9 +68,10 @@
         </div>
 
         <div class="legend-note">
-            <span>🟢 MSTR Price Magnet</span>
-            <span>🔵 BTC Price Magnet</span>
-            <span>📊 Bars: Call (Green) / Put (Red) Volume</span>
+            <span>🟢 <b>MSTR Max Pain</b> (Price Magnet)</span>
+            <span>🔵 <b>BTC Max Pain</b> (Trend Guide)</span>
+            <span>📊 <b>Bars:</b> Call (Green) / Put (Red) Open Interest</span>
+            <span><span class="red-dot">◆ Red Diamond:</span> Monthly Expiry (Strongest Magnet)</span>
         </div>
     </div>
 
@@ -56,8 +86,8 @@
             const response = await fetch('./data/history.json');
             const rawData = await response.json();
             
-            // --- THE FILTER LOGIC ---
-            // Only keep points where price is logical (between 30% and 500% of spot)
+            // --- AUTO-FILTER LOGIC ---
+            // Removes illogical spikes (near $0 or > 500% of current price)
             const spot = rawData.spot;
             globalPayload = {
                 ...rawData,
@@ -68,28 +98,68 @@
             renderChart();
             updateAnalysis();
         } catch (err) {
-            document.getElementById('scoreLabel').innerText = "Data missing. Run Python script.";
+            document.getElementById('scoreLabel').innerText = "DATA MISSING: Ensure history.json exists.";
         }
+    }
+
+    function isMonthly(dateStr) {
+        const date = new Date(dateStr);
+        const day = date.getUTCDate(); // Using UTC to avoid timezone shifts
+        // The 3rd Friday always falls between the 15th and 21st
+        return day >= 15 && day <= 21;
+    }
+
+    function getMarketPhase() {
+        const day = new Date().getDay(); 
+        const phases = {
+            1: { name: "Provisional", color: "#3498db" },
+            2: { name: "Provisional", color: "#3498db" },
+            3: { name: "Sweet Spot", color: "#00ff88" },
+            4: { name: "Reactive", color: "#ffcc00" },
+            5: { name: "Reactive", color: "#ffcc00" }
+        };
+        return phases[day] || { name: "Weekend", color: "#888" };
     }
 
     function updateAnalysis() {
         if (!globalPayload) return;
         const strike = parseFloat(document.getElementById('strikeInput').value);
         const spot = globalPayload.spot;
+        const phase = getMarketPhase();
+        
+        // Use filtered data for magnets
         const weeklyPain = globalPayload.data[0]?.mstr_pain || 0;
+        const monthlyItem = globalPayload.data.find(d => isMonthly(d.date));
+        const monthlyPain = monthlyItem ? monthlyItem.mstr_pain : weeklyPain;
 
+        // UI Updates
+        const phaseEl = document.getElementById('phaseDisplay');
+        phaseEl.innerText = `Phase: ${phase.name}`;
+        phaseEl.style.borderColor = phase.color;
+        phaseEl.style.color = phase.color;
+
+        // Scoring Logic
         let score = 0;
-        if (spot > strike * 1.10) score += 5; 
-        if (weeklyPain > strike) score += 5; 
+        if (spot > strike * 1.12) score += 4; // Price Buffer
+        else if (spot > strike) score += 2;
+        if (weeklyPain > strike) score += 3;  // Weekly protection
+        if (monthlyPain > strike) score += 3; // Monthly protection
 
         const scoreBox = document.getElementById('scoreBox');
         document.getElementById('scoreValue').innerText = `Safety Score: ${score}/10`;
         
-        if (score >= 8) scoreBox.className = "score-box safe-bg";
-        else if (score >= 5) scoreBox.className = "score-box caution-bg";
-        else scoreBox.className = "score-box danger-bg";
+        if (score >= 8) {
+            scoreBox.className = "score-box safe-bg";
+            document.getElementById('scoreLabel').innerText = "SAFE TO PROCEED";
+        } else if (score >= 5) {
+            scoreBox.className = "score-box caution-bg";
+            document.getElementById('scoreLabel').innerText = "USE CAUTION";
+        } else {
+            scoreBox.className = "score-box danger-bg";
+            document.getElementById('scoreLabel').innerText = "HIGH RISK / SELL LOWER";
+        }
         
-        document.getElementById('scoreLabel').innerText = score >= 8 ? "SAFE" : (score >= 5 ? "CAUTION" : "DANGER");
+        if(myChart) myChart.update();
     }
 
     function renderChart() {
@@ -100,22 +170,24 @@
             data: {
                 labels: labels,
                 datasets: [
-                    // VOLUME BARS (Overlay)
+                    // VOLUME BARS (Overlayed in Background)
                     {
                         type: 'bar',
                         label: 'Calls (OI)',
                         data: globalPayload.data.map(d => d.call_oi || 0),
-                        backgroundColor: 'rgba(0, 255, 136, 0.2)',
+                        backgroundColor: 'rgba(0, 255, 136, 0.15)',
                         yAxisID: 'yVol',
-                        stack: 'stack1'
+                        stack: 'stack1',
+                        order: 2
                     },
                     {
                         type: 'bar',
                         label: 'Puts (OI)',
                         data: globalPayload.data.map(d => d.put_oi || 0),
-                        backgroundColor: 'rgba(255, 68, 68, 0.2)',
+                        backgroundColor: 'rgba(255, 68, 68, 0.15)',
                         yAxisID: 'yVol',
-                        stack: 'stack1'
+                        stack: 'stack1',
+                        order: 2
                     },
                     // PRICE LINES
                     {
@@ -124,8 +196,12 @@
                         data: globalPayload.data.map(d => d.mstr_pain),
                         borderColor: '#00ff88',
                         borderWidth: 3,
+                        pointBackgroundColor: labels.map(d => isMonthly(d) ? '#ff4444' : '#00ff88'),
+                        pointRadius: labels.map(d => isMonthly(d) ? 8 : 4),
+                        pointStyle: labels.map(d => isMonthly(d) ? 'rectRot' : 'circle'),
                         yAxisID: 'yPrice',
-                        tension: 0.3
+                        tension: 0.3,
+                        order: 1
                     },
                     {
                         type: 'line',
@@ -134,20 +210,41 @@
                         borderColor: '#3498db',
                         borderDash: [5, 5],
                         yAxisID: 'yBTC',
-                        tension: 0.3
+                        tension: 0.3,
+                        order: 1
                     }
                 ]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            afterLabel: function(context) {
+                                if (isMonthly(context.label)) return "⭐ MONTHLY EXPIRY (High Vol)";
+                            }
+                        }
+                    }
+                },
                 scales: {
-                    yPrice: { type: 'linear', position: 'left', title: { display: true, text: 'MSTR Price ($)' } },
-                    yBTC: { type: 'linear', position: 'right', grid: { display: false }, title: { display: true, text: 'BTC Price ($)' } },
+                    yPrice: { 
+                        type: 'linear', 
+                        position: 'left', 
+                        grid: { color: '#333' },
+                        title: { display: true, text: 'MSTR Price ($)', color: '#888' }
+                    },
+                    yBTC: { 
+                        type: 'linear', 
+                        position: 'right', 
+                        grid: { display: false },
+                        title: { display: true, text: 'BTC Price ($)', color: '#3498db' }
+                    },
                     yVol: { 
                         type: 'linear', 
                         position: 'right', 
-                        display: false, // Keep it clean, volume is for visual weight
+                        display: false, // Hidden but used for scaling the background bars
                         grid: { display: false } 
                     }
                 }
