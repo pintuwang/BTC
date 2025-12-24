@@ -1,54 +1,24 @@
 {
-    "last_update_utc": "2025-12-24T08:43:15.373834Z",
+    "last_update_utc": "2025-12-24T08:53:08.007179Z",
     "spot": 157.88,
-    "phase": "Sweet Spot (Wednesday)",
+    "phase": "Wednesday",
     "data": [
         {
-            "date": "2025-12-26",
-            "mstr_pain": 85.0,
-            "btc_pain": 86849.38,
-            "is_monthly": false
-        },
-        {
-            "date": "2026-01-02",
-            "mstr_pain": 85.0,
-            "btc_pain": 86849.38,
-            "is_monthly": false
-        },
-        {
-            "date": "2026-01-09",
-            "mstr_pain": 100.0,
-            "btc_pain": 86849.38,
-            "is_monthly": false
-        },
-        {
             "date": "2026-01-16",
-            "mstr_pain": 23.0,
-            "btc_pain": 86849.38,
+            "mstr_pain": 15.0,
+            "btc_pain": 96000.0,
             "is_monthly": true
-        },
-        {
-            "date": "2026-01-23",
-            "mstr_pain": 100.0,
-            "btc_pain": 86849.38,
-            "is_monthly": false
-        },
-        {
-            "date": "2026-01-30",
-            "mstr_pain": 100.0,
-            "btc_pain": 86849.38,
-            "is_monthly": false
         },
         {
             "date": "2026-02-20",
             "mstr_pain": 740.0,
-            "btc_pain": 86849.38,
+            "btc_pain": 96000.0,
             "is_monthly": true
         },
         {
             "date": "2026-03-20",
-            "mstr_pain": 770.0,
-            "btc_pain": 86849.38,
+            "mstr_pain": 640.0,
+            "btc_pain": 96000.0,
             "is_monthly": true
         }
     ]
