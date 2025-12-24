@@ -24,11 +24,14 @@ jobs:
       - name: Run Monitor
         run: python calculate_pain.py
         
-      - name: Commit changes
+    - name: Commit and Push
         run: |
           git config --local user.email "actions@github.com"
-          git config --local user.name "GitHub Action"
-          git add data/*.json
-          git commit -m "Update Market Data and History Log [skip ci]" || exit 0
-          git pull --rebase origin main
-          git push
+          git config --local user.name "github-actions[bot]"
+          git fetch origin main
+          git checkout main
+          git add .
+          git commit -m "Update Market Data [skip ci]" || echo "No changes"
+          # This pulls changes and if there is a conflict, it forces the script's version to win
+          git pull --rebase -X theirs origin main
+          git push origin main
