@@ -2,40 +2,25 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>MSTR Strategic Monitor - SGT Edition</title>
+    <title>MSTR/BTC Strategic Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: 'Inter', sans-serif; background: #080808; color: #fff; padding: 20px; }
-        .container { max-width: 1100px; margin: auto; background: #111; padding: 30px; border-radius: 20px; border: 1px solid #222; }
-        
-        /* Confidence Badge Styling */
-        .confidence-pill { 
-            display: inline-block; padding: 6px 15px; border-radius: 20px; 
-            font-size: 0.8em; font-weight: bold; text-transform: uppercase; margin-top: 10px;
-        }
-        .provisional { background: #332200; color: #ffcc00; }
-        .sweet-spot { background: #003311; color: #00ff88; border: 1px solid #00ff88; }
-        .reactive { background: #330000; color: #ff4444; animation: pulse 2s infinite; }
-
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
-        
-        .score-box { text-align: center; border-radius: 15px; background: #1a1a1a; padding: 40px; margin-bottom: 30px; border: 1px solid #333; }
-        .chart-container { height: 400px; margin: 20px 0; }
-        #sgt-time { color: #888; font-size: 0.9em; font-weight: 500; }
+        .container { max-width: 1200px; margin: auto; background: #111; padding: 30px; border-radius: 15px; border: 1px solid #222; }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; padding-bottom: 20px; }
+        .chart-container { height: 550px; margin-top: 30px; }
+        .caret-note { color: #ff4444; font-size: 0.8em; font-weight: bold; margin-top: 10px; }
+        #sgt-time { color: #888; font-size: 0.9em; }
+        table { width: 100%; border-collapse: collapse; margin-top: 30px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #222; }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="score-box" id="mainHeader">
-            <h1 id="scoreDisplay" style="font-size: 4em; margin: 0;">--</h1>
-            <div id="confidenceBadge" class="confidence-pill">LOADING...</div>
-            <p id="statusMsg" style="margin-top: 15px; letter-spacing: 1px; color: #aaa;"></p>
-        </div>
-
-        <div style="display: flex; justify-content: space-between; align-items: flex-end; padding: 0 10px;">
+        <div class="header">
             <div>
-                <label style="color: #666;">Strike Target</label><br>
-                <input type="number" id="strikeInput" value="150" oninput="updateDisplay()" style="background:#222; border:1px solid #444; color:#00ff88; padding:8px; border-radius:5px; width:100px; font-size:1.1em;">
+                <h1 style="margin:0; color:#00ff88;">Institutional Magnet Monitor</h1>
+                <div class="caret-note">▲ RED TRIANGLE = Monthly Expiry (High Gravity)</div>
             </div>
             <div id="sgt-time">SGT: --</div>
         </div>
@@ -44,89 +29,78 @@
             <canvas id="mainChart"></canvas>
         </div>
 
-        <h3 style="margin-top:40px;">Historical Data Log</h3>
-        <table style="width:100%; border-collapse: collapse; background:#161616; border-radius:10px; overflow:hidden;">
-            <thead style="background:#222; color:#777;">
-                <tr><th style="padding:15px; text-align:left;">Date</th><th>Spot</th><th>Max Pain</th><th>Phase</th></tr>
-            </thead>
-            <tbody id="logBody" style="text-align:center;"></tbody>
+        <h3>30-Day Snapshot Log</h3>
+        <table id="logTable">
+            <thead><tr><th>Date</th><th>BTC Spot</th><th>MSTR Pain</th><th>Phase</th></tr></thead>
+            <tbody id="logBody"></tbody>
         </table>
     </div>
 
 <script>
-    let marketData = null;
-    let chartInstance = null;
-
-    async function init() {
+    async function load() {
         const res = await fetch('./data/history.json');
-        marketData = await res.json();
+        const market = await res.json();
         
-        // Convert UTC to Singapore Time
-        const utcDate = new Date(marketData.last_update_utc);
-        const sgtString = utcDate.toLocaleString('en-SG', { 
-            timeZone: 'Asia/Singapore',
-            dateStyle: 'medium',
-            timeStyle: 'short'
-        });
-        document.getElementById('sgt-time').innerText = `Updated (SGT): ${sgtString}`;
-        
-        updateDisplay();
-        loadHistoryTable();
+        // SGT Time Setup
+        const utc = new Date(market.last_update_utc);
+        document.getElementById('sgt-time').innerText = `Updated (SGT): ${utc.toLocaleString('en-SG', {timeZone:'Asia/Singapore'})}`;
+
+        render(market.data);
+        renderTable();
     }
 
-    function updateDisplay() {
-        const strike = parseFloat(document.getElementById('strikeInput').value);
-        const spot = marketData.spot;
-        const pain = marketData.data[0].mstr_pain;
-        const confidence = marketData.confidence;
-
-        // Visual Logic
-        const badge = document.getElementById('confidenceBadge');
-        badge.innerText = confidence;
-        badge.className = "confidence-pill " + (confidence.includes("Provisional") ? "provisional" : 
-                                               confidence.includes("Sweet") ? "sweet-spot" : "reactive");
-
-        let score = (spot > strike * 1.1) ? 4 : 0;
-        score += (pain > strike) ? 6 : 0;
-
-        document.getElementById('scoreDisplay').innerText = `${score}/10`;
-        document.getElementById('scoreDisplay').style.color = score >= 8 ? "#00ff88" : "#ffcc00";
-        document.getElementById('statusMsg').innerText = score >= 8 ? "STRATEGY: HOLD / NEUTRAL" : "STRATEGY: CAUTION / COVER";
-
-        renderChart(strike);
-    }
-
-    function renderChart(strike) {
+    function render(data) {
         const ctx = document.getElementById('mainChart').getContext('2d');
-        if (chartInstance) chartInstance.destroy();
-
-        chartInstance = new Chart(ctx, {
+        new Chart(ctx, {
             type: 'line',
             data: {
-                labels: marketData.data.map(d => d.date),
+                labels: data.map(d => d.date),
                 datasets: [
-                    { label: 'MSTR Max Pain', data: marketData.data.map(d => d.mstr_pain), borderColor: '#00ff88', tension: 0.3 },
-                    { label: 'BTC Proxy', data: marketData.data.map(d => d.btc_pain / 550), borderColor: '#3498db', borderDash: [5,5], tension: 0.3 }
+                    {
+                        label: 'MSTR Max Pain',
+                        data: data.map(d => d.mstr_pain),
+                        borderColor: '#00ff88',
+                        yAxisID: 'yMSTR',
+                        pointStyle: data.map(d => d.is_monthly ? 'triangle' : 'circle'),
+                        pointRadius: data.map(d => d.is_monthly ? 12 : 5),
+                        pointBackgroundColor: data.map(d => d.is_monthly ? 'red' : '#00ff88'),
+                        tension: 0.3
+                    },
+                    {
+                        label: 'BTC Max Pain',
+                        data: data.map(d => d.btc_pain),
+                        borderColor: '#3498db',
+                        borderDash: [5, 5],
+                        yAxisID: 'yBTC',
+                        tension: 0.3
+                    }
                 ]
             },
-            options: { responsive: true, maintainAspectRatio: false, scales: { y: { grid: { color: '#222' } } } }
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    yMSTR: { type: 'linear', position: 'left', grid: { color: '#222' }, title: { display: true, text: 'MSTR ($)' } },
+                    yBTC: { type: 'linear', position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'BTC ($)' } }
+                }
+            }
         });
     }
 
-    async function loadHistoryTable() {
+    async function renderTable() {
         const res = await fetch('./data/history_log.json');
         const logs = await res.json();
         document.getElementById('logBody').innerHTML = logs.reverse().map(l => `
-            <tr style="border-bottom: 1px solid #222;">
-                <td style="padding:15px; text-align:left;">${l.date}</td>
-                <td>$${l.spot}</td>
+            <tr>
+                <td>${l.date}</td>
+                <td>$${l.spot.toLocaleString()}</td>
                 <td>$${l.mstr_pain}</td>
-                <td><small>${l.confidence}</small></td>
+                <td>${l.confidence}</td>
             </tr>
         `).join('');
     }
 
-    init();
+    load();
 </script>
 </body>
 </html>
