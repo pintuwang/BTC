@@ -1,35 +1,33 @@
-name: Update Max Pain Monitor
-
+name: Market Monitor Sync
 on:
   schedule:
-    - cron: '0 0 * * 2' # Runs every Tuesday
-  workflow_dispatch: # Enables the manual "Run" button in GitHub Actions UI
+    - cron: '0 13 * * 1-5' # Runs daily at 1PM UTC (Mon-Fri)
+  workflow_dispatch:      # Allows manual refresh
+
+permissions:
+  contents: write         # CRITICAL: Allows saving history_log.json
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write # Allows the script to save data back to the repo
-
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
+      - uses: actions/checkout@v3
+      
       - name: Set up Python
-        uses: actions/checkout@v4
+        uses: actions/setup-python@v4
         with:
-          python-version: '3.10'
-
+          python-version: '3.9'
+          
       - name: Install Dependencies
-        run: pip install yfinance pandas numpy requests
-
-      - name: Run Max Pain Script
-        run: python calculate_pain.py
-
-      - name: Commit and Push Changes
+        run: pip install requests
+        
+      - name: Run Monitor
+        run: python monitor.py
+        
+      - name: Commit changes
         run: |
-          git config --global user.name "Max Pain Bot"
-          git config --global user.email "bot@github.com"
-          git add data/history.json index.html
-          git commit -m "Manual/Weekly Update: $(date)" || echo "No changes to commit"
+          git config --local user.email "actions@github.com"
+          git config --local user.name "GitHub Action"
+          git add data/*.json
+          git commit -m "Update Market Data and History Log [skip ci]" || exit 0
           git push
