@@ -1,62 +1,30 @@
 {
-    "last_update": "2026-01-12 13:39",
-    "last_update_utc": "2026-01-12T13:39:30.638683Z",
-    "spot": 157.33,
+    "last_update": "2026-01-13 13:38",
+    "last_update_utc": "2026-01-13T13:38:36.094315Z",
+    "spot": 162.23,
     "data": [
         {
             "date": "2026-01-16",
-            "mstr_pain": 147.0,
+            "mstr_pain": 71.0,
             "btc_pain": 90000.0,
-            "call_oi": 505643,
-            "put_oi": 434323,
+            "call_oi": 11834,
+            "put_oi": 1275,
             "is_monthly": true
         },
         {
-            "date": "2026-01-23",
-            "mstr_pain": 170.0,
-            "btc_pain": 92000.0,
-            "call_oi": 28355,
-            "put_oi": 36047,
-            "is_monthly": false
-        },
-        {
-            "date": "2026-01-30",
-            "mstr_pain": 170.0,
-            "btc_pain": 90000.0,
-            "call_oi": 25036,
-            "put_oi": 35995,
-            "is_monthly": false
-        },
-        {
-            "date": "2026-02-06",
-            "mstr_pain": 165.0,
-            "btc_pain": 90000.0,
-            "call_oi": 13429,
-            "put_oi": 11971,
-            "is_monthly": false
-        },
-        {
-            "date": "2026-02-13",
-            "mstr_pain": 170.0,
-            "btc_pain": 90000.0,
-            "call_oi": 7319,
-            "put_oi": 4277,
-            "is_monthly": false
-        },
-        {
             "date": "2026-02-20",
-            "mstr_pain": 165.0,
+            "mstr_pain": 480.0,
             "btc_pain": 90000.0,
-            "call_oi": 134422,
-            "put_oi": 65655,
+            "call_oi": 286,
+            "put_oi": 14,
             "is_monthly": true
         },
         {
             "date": "2026-03-20",
-            "mstr_pain": 160.0,
+            "mstr_pain": 640.0,
             "btc_pain": 95000.0,
-            "call_oi": 190679,
-            "put_oi": 91345,
+            "call_oi": 5,
+            "put_oi": 148,
             "is_monthly": true
         }
     ]
