@@ -1,9 +1,11 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>MSTR/BTC Strategic Monitor - Professional Edition</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"
+        integrity="sha384-b0GXujLkk9eYYSmcSfoyZbfyElGAQnDyY0skCHSG6w3JgTMFnz11ggrTAr7seu9f"
+        crossorigin="anonymous"></script>
     <style>
         /* Base Styling */
         body { font-family: 'Segoe UI', Roboto, sans-serif; background: #0f0f0f; color: #e0e0e0; padding: 20px; }
@@ -44,7 +46,7 @@
 </head>
 <body>
     <div class="container">
-        <h2 style="margin-top: 0; color: #fff;">📈 MSTR Strategic Put Advisor <span style="font-size: 0.6em; color: #888;">(Price & Volume)</span></h2>
+        <h2 style="margin-top: 0; color: #fff;">ðŸ“ˆ MSTR Strategic Put Advisor <span style="font-size: 0.6em; color: #888;">(Price & Volume)</span></h2>
 
         <div class="controls">
             <div>
@@ -56,7 +58,7 @@
                 <div id="phaseDisplay" class="phase-tag">Detecting Phase...</div>
                 <div class="phase-tooltip">
                     <b>Provisional (Mon/Tue):</b> Data is still building. Use for planning only.<br><br>
-                    <b>Sweet Spot (Wed):</b> 🟢 <b>Highest Accuracy.</b> Most OI is locked in.<br><br>
+                    <b>Sweet Spot (Wed):</b> ðŸŸ¢ <b>Highest Accuracy.</b> Most OI is locked in.<br><br>
                     <b>Reactive (Thu/Fri):</b> Max gravitational force toward the magnet.
                 </div>
             </div>
@@ -75,10 +77,10 @@
         </div>
 
         <div class="legend-note">
-            <span>🟢 <b>MSTR Max Pain</b> (Price Magnet)</span>
-            <span>🔵 <b>BTC Max Pain</b> (Trend Guide)</span>
-            <span>📊 <b>Bars:</b> Call (Green) / Put (Red) Open Interest</span>
-            <span><span class="red-dot">◆ Red Diamond:</span> Monthly Expiry</span>
+            <span>ðŸŸ¢ <b>MSTR Max Pain</b> (Price Magnet)</span>
+            <span>ðŸ”µ <b>BTC Max Pain</b> (Trend Guide)</span>
+            <span>ðŸ“Š <b>Bars:</b> Call (Green) / Put (Red) Open Interest</span>
+            <span><span class="red-dot">â—† Red Diamond:</span> Monthly Expiry</span>
         </div>
     </div>
 
@@ -142,9 +144,9 @@
             const diff = spot - yesterdaySpot;
             const pct = ((diff / yesterdaySpot) * 100).toFixed(1);
             
-            if (diff > 0.5) trendBox.innerHTML = `<span class="trend-badge trend-up">▲ Spot +${pct}%</span>`;
-            else if (diff < -0.5) trendBox.innerHTML = `<span class="trend-badge trend-down">▼ Spot ${pct}%</span>`;
-            else trendBox.innerHTML = `<span class="trend-badge trend-flat">↔ Flat</span>`;
+            if (diff > 0.5) trendBox.innerHTML = `<span class="trend-badge trend-up">â–² Spot +${pct}%</span>`;
+            else if (diff < -0.5) trendBox.innerHTML = `<span class="trend-badge trend-down">â–¼ Spot ${pct}%</span>`;
+            else trendBox.innerHTML = `<span class="trend-badge trend-flat">â†” Flat</span>`;
         }
 
         // --- Score Logic ---
@@ -212,3 +214,4 @@
 </script>
 </body>
 </html>
+
